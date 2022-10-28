@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <BitArray.h>
+//#include <BitArray.h>
 
 // 40 Pin Assignment
 // Resistor Power
@@ -181,10 +181,11 @@ int digitalLoadSize = 0;
 int analogLoadSize = 0;
 bool sentLoadSize = false;
 bool initilize = false;
-int SlaveID = 253;
+byte SlaveID = 253;
 bool firstContact = false;
 byte moduleIDChunk = 0; // Module ID has to be sent in 3 parts due to 32 bit limit on i2c, this keeps track of how much has been sent
 byte runs = 0;
+bool confirmID = false;
 int makeLinear(float y)
 {
   float a = 102; // pot max
@@ -201,11 +202,24 @@ int makeLinear(float y)
   return ((-(-pow(a, 2) * y - a * b * y + c * a - sqrt(pow((pow(a, 2) * y + a * b * y - c * a), 2) + 4 * pow(a, 2) * y * (c * a * y + c * b * y))) / (2 * pow(a, 2) * y)) * 1024);
 }
 
-void sendButton(byte buttonState, int keyData)
+void sendButton()
 {
-  Wire.write(buttonState);
-  Wire.write(highByte(keyData)); // send byte 1
-  Wire.write(lowByte(keyData));  // send byte 2
+  for (int row = 0; row < sizeof(rowArray); row++) // calulate digital load size here
+  {
+    for (int col = 0; col < sizeof(colArray); col++)
+    {
+      if (changed[row][col] == 2)
+      {
+        Wire.write(SlaveID);
+        // Wire.write(highByte(dButtonArray[row][col]));
+        // Wire.write(lowByte(dButtonArray[row][col]));
+        // Wire.write(highByte(keyAssignment[row][col])); // send byte 1
+        // Wire.write(lowByte(keyAssignment[row][col]));  // send byte 2
+        changed[row][col] = 0;
+        break;
+      }
+    }
+  }
 }
 
 void receiveEvent(int receiveSize)
@@ -223,100 +237,90 @@ void receiveEvent(int receiveSize)
   }
 
   // prepare the load size
-  if (initilize == true)
-  {
-    if (Wire.read() == 10)
-    { // prepare load size
-      sentLoadSize = false;
-      digitalLoadSize = (digitalChanges * 3); // sends the 4 data points for each button change
-      analogLoadSize = (analogChanges * 3);   // send the 3 datapoints for each analog change
-    }
-  }
+  //  if (initilize == true)
+  //  {
+  //    if (Wire.read() == 10)
+  //    { // prepare load size
+  //      sentLoadSize = false;
+  //      digitalLoadSize = (digitalChanges * 5); // sends the 4 data points for each button change
+  //      analogLoadSize = (analogChanges * 3);   // send the 3 datapoints for each analog change
+  //    }
+  //  }
 }
 
 void requestEvent()
 {
 
-  // initiates first contact and sends back data
-  if (firstContact == false)
-  { // when initilizing
-    Wire.write(253);
-    firstContact = true;
-  }
-
-  /*{ // module ID system
-  //***** MODULE ASSINGMENT WORK ON LATER PLZ
-  // sending the moduleID array to the master // this will be called by the master 3 times to get all the data.
-  if (firstContact == true && initilize == false && moduleIDChunk == 0)
-  { // used the moduleIDChunk to keep track of data sent
-    for (byte i = 0; i < sizeof(rowArray); i++)
-    { // sizeof(rowArray)
-      for (byte j = 0; j < sizeof(colArray); j++)
-      {
-        Wire.write(highByte(moduleID[i][j]));
-        Wire.write(lowByte(moduleID[i][j]));
-      }
-    }
-    moduleIDChunk = 1;
-  }
-  }*/
-
-  if (initilize == true)
+  if (initilize == true && confirmID == true)
   { // normal operation
 
     sendingLoad = true;
-
     digitalLoadSize = 0;
     for (int row = 0; row < sizeof(rowArray); row++) // calulate digital load size here
     {
       for (int col = 0; col < sizeof(colArray); col++)
       {
 
-        if (changed[row][col] == 1)
+        if (changed[row][col] == 1 && assignmentArray[row][col] == 1) // checks if it is a digital button and if the button has changed
         {
-          changed[row][col] = 0;
-          digitalLoadSize++; // should fully reset the changed matrix
+          changed[row][col] = 2;                 // will be set back to 0 when the data is sent back to the master by the send button function
+          digitalLoadSize = digitalLoadSize + 1; // should fully reset the changed matrix
         }
       }
     }
 
-    if (sentLoadSize == false)
+    if (sentLoadSize == false) // ERROR THIS IS NOT BEING SET BACK TO FALSE.
     {
       Wire.write(digitalLoadSize);
       Wire.write(analogLoadSize);
-      sentLoadSize = true; // send the load size
-
-      while (digitalLoadSize / 32 > 1) // start generating runs
+      if (digitalLoadSize + analogLoadSize > 0)//does not  continue with sending load if there is no data to send
       {
-        runs++;
-        digitalLoadSize - 32;
+        sentLoadSize = true;             // send the load size
+        while (digitalLoadSize / 30 > 1) // start generating runs
+        {
+          runs++;
+          digitalLoadSize = digitalLoadSize - 30;
+        }
       }
+      
     }
-    else // start sending the load
+
+    if (sentLoadSize == true) // start sending the load
     {
 
       if (sentdigital == false)
       {
         if (runs != 0)
         {
-          for (byte i = 0; i < 32; i++) // sending the bytes in 32-lot chunks
+          for (byte i = 0; i < 30; i++) // sending the bytes in 32-lot chunks
           {
-            // send bytes here
+            Wire.write(5);
+            digitalWrite(Led1, HIGH);
+            //sendButton();
           }
 
           runs--;
         }
-        else
+        if (runs == 0)
         {
           for (byte i = 0; i < digitalLoadSize; i++) // will send the remaining digital load that is less than 32 bytes
           {
-            // send bytes here
+            Wire.write(5);
+            digitalWrite(Led1, HIGH);
+            //sendButton();
           }
           digitalLoadSize = 0;
           sentdigital = true;
           sentLoadSize = false; // reset flag for load sent // move back down to bottom after
+          for (int row = 0; row < sizeof(rowArray); row++)
+          {
+            for (int col = 0; col < sizeof(colArray); col++)
+            {
+              oldButtonArray[row][col] = dButtonArray[row][col];
+              dButtonArray[row][col] =0;
+            }
+          }
         }
-        
       }
 
       // sending the 6 buttons
@@ -341,11 +345,7 @@ void requestEvent()
       //   oldButtonArray[i] = dButtonArray[i];
       //   dButtonArray[i] = 0;
       // }
-     
-     
-     
-     
-     
+
       // if (sentdigital == true)
       // {
       //   for (int i = 0; i < sizeof(rowArray); i++)
@@ -379,10 +379,23 @@ void requestEvent()
 
       //   analogChanges = 0; // reset counter for amount of analog changes wiating to be sent.
 
-        
       // }
-
     }
+  }
+
+  if (firstContact == true && confirmID == false)
+  {
+    Wire.write(67);
+    Wire.write(SlaveID);
+    confirmID = true;
+    digitalWrite(Led2, HIGH);
+  }
+
+  // initiates first contact and sends back data
+  if (firstContact == false)
+  { // when initilizing
+    Wire.write(253);
+    firstContact = true;
   }
 }
 
@@ -450,7 +463,7 @@ void setup()
 
 void loop()
 {
-  digitalWrite(Led1, LOW);
+  //digitalWrite(Led1, LOW);
   // loop through rows
   // loop through each collunm
   // turn collum on
@@ -459,8 +472,9 @@ void loop()
   // read collum
   // turn collum off
 
-  if (initilize == true || sendingLoad == false)
+  if (initilize == true)// && sendingLoad == false)
   {
+    
 
     for (int row = 0; row < sizeof(rowArray); row++)
     {
@@ -486,7 +500,6 @@ void loop()
           {                        // checks if the key press has changed from the previous send
             changed[row][col] = 1; // enter the change into the changed matrix
                                    // will need to calulate the digital changes after
-            digitalWrite(Led1, HIGH);
           }
           else
           {
@@ -494,6 +507,7 @@ void loop()
             changed[row][col] = 0; // if it is the same the clear the change from the change matrix
           }
         }
+
         if (assignmentArray[row][col] == 2 || assignmentArray[row][col] == 102)
         { // check if it is a analog assignment
 
