@@ -237,11 +237,15 @@ void sendAnalog()
     {
       if (changed[row][col] == 3)
       {
+        // Wire.write(1);
+        // Wire.write(253);
+        // Wire.write(10);
         Wire.write(SlaveID);
         Wire.write(highByte(analogArray[row][col]));
         Wire.write(lowByte(analogArray[row][col]));
         assignmentArray[row][col] = 2;
         changed[row][col] = 0;
+        digitalWrite(Led2, HIGH);
         break;
       }
     }
@@ -278,6 +282,7 @@ void requestEvent()
 {
 
   digitalWrite(Led1, LOW);
+  
   if (initilize == true && confirmID == true)
   { // normal operation
 
@@ -293,6 +298,7 @@ void requestEvent()
           changed[row][col] = 2;                                   // will be set back to 0 when the data is sent back to the master by the send button function
           digitalLoadSize = digitalLoadSize + digitalChangeWeight; // should fully reset the changed matrix
         }
+
 
         // calulate analog load size here
         if (changed[row][col] == 1 && assignmentArray[row][col] == 102) // checks if analog and if value has changed 102 = changed analog signal
@@ -320,7 +326,7 @@ void requestEvent()
 
           digitalRuns--;
         }
-
+        
         if (digitalRuns == 0)
         {
           for (byte i = 0; i < digitalLoadSize / digitalChangeWeight; i++) // will send the remaining digital load that is less than 32 bytes
@@ -353,7 +359,7 @@ void requestEvent()
           for (byte i = 0; i < 30 / analogChangeWeight; i++) // sending the bytes in 32-lot chunks
           {
             sendAnalog();
-            digitalWrite(Led2, HIGH);
+
           }
 
           analogRuns--;
@@ -364,13 +370,14 @@ void requestEvent()
           for (byte i = 0; i < analogLoadSize / analogChangeWeight; i++) // will send the remaining digital load that is less than 32 bytes
           {
             sendAnalog();
-            digitalWrite(Led2, HIGH);
+            
           }
 
           analogLoadSize = 0;
           sentAnalog = true;
           // sentLoadSize = false; // reset flag for load sent // move back down to bottom after
         }
+        analogLoadSize = 0;
       }
 
       // if (sentdigital == true)
@@ -410,6 +417,7 @@ void requestEvent()
 
       if (sentAnalog == true || sentdigital == true)
       {
+        //Wire.write(25);
          sentLoadSize = false;
       }
     }
@@ -521,7 +529,7 @@ void setup()
 
 void loop()
 {
-
+  digitalWrite(Led2, LOW);
   // loop through rows
   // loop through each collunm
   // turn collum on
