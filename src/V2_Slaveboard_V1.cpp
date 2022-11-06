@@ -38,12 +38,12 @@ int Led2 = 25;
 int Led3 = 24;
 
 // transostor for i2c line
-int Sdasig = 12;
+byte Sdasig = 12;
 
 byte assignmentArray[6][7] = {
     // array to hold assignment for possition, digital or analogue
-    {1, 1, 1, 1, 1, 1, 1},
-    {0, 0, 2, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
@@ -78,9 +78,9 @@ int analogArray[6][7] = {
 
 int moduleID[6][7] = {
     // module ID array called for in initilization in the master
-    {1024, 1024, 32, 1024, 512, 256, 1024},
-    {0, 0, 0, 0, 1024, 0, 14},
-    {0, 16, 0, 255, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0},
@@ -221,12 +221,26 @@ void sendLayout()
     for (int col = 0; col < sizeof(resistorArray); col++)
     {
       digitalWrite(resistorArray[col], HIGH);
-
-      resistorRead = analogRead(rowArray[currentRow]);
-
-      Wire.write(resistorRead);
+      
+      moduleID[currentRow][col] = analogRead(rowArray[currentRow]);
+      Wire.write(highByte(moduleID[currentRow][col]));
+      Wire.write(lowByte(moduleID[currentRow][col]));
 
       digitalWrite(resistorArray[col], LOW);
+      
+      //calulating the assignment array
+      //Assign digital
+      if (moduleID[currentRow][col] > 500 && moduleID[currentRow][col] < 550){
+        assignmentArray[currentRow][col] = 1;
+      }
+
+      //Assign analog
+      if (moduleID[currentRow][col] > 140 && moduleID[currentRow][col] < 160){
+        assignmentArray[currentRow][col] = 2;
+      }
+
+      
+
     }
     currentRow++;
   }
@@ -242,7 +256,7 @@ void receiveEvent(int receiveSize)
     Wire.end();
     Wire.begin(SlaveID);
     initilize = true;
-    Sdasig = HIGH;
+    digitalWrite(Sdasig, HIGH);
     // sending led 3 was here 
   }
 }
@@ -343,11 +357,12 @@ void requestEvent()
   if (initilize == true && confirmID == true && sentLayout == false)
   {
     sendLayout();
-    if (currentRow > 6)
+    if (currentRow > 5)
     {
       sentLayout = true;
       currentRow = 0;
       digitalWrite(Led3, HIGH);
+      
     }
     
   }
@@ -430,7 +445,7 @@ void loop()
   // read collum
   // turn collum off
 
-  if (initilize == true) // && sendingLoad == false)
+  if (initilize == true && sentLayout == true) // && sendingLoad == false)
   {
 
     for (int row = 0; row < sizeof(rowArray); row++)
