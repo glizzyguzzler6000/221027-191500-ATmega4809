@@ -220,14 +220,11 @@ void sendLayout()
 
     for (int col = 0; col < sizeof(resistorArray); col++)
     {
+
       digitalWrite(resistorArray[col], HIGH);
       
       moduleID[currentRow][col] = analogRead(rowArray[currentRow]);
-      Wire.write(highByte(moduleID[currentRow][col]));
-      Wire.write(lowByte(moduleID[currentRow][col]));
 
-      digitalWrite(resistorArray[col], LOW);
-      
       //calulating the assignment array
       //Assign digital
       if (moduleID[currentRow][col] > 500 && moduleID[currentRow][col] < 550){
@@ -238,6 +235,13 @@ void sendLayout()
       if (moduleID[currentRow][col] > 140 && moduleID[currentRow][col] < 160){
         assignmentArray[currentRow][col] = 2;
       }
+
+
+      Wire.write(highByte(assignmentArray[currentRow][col]));
+      Wire.write(lowByte(assignmentArray[currentRow][col]));
+
+      digitalWrite(resistorArray[col], LOW);
+      
 
       
 
