@@ -154,6 +154,9 @@ bool sentLayout = false;
 bool sendingData = false;
 
 bool confirmID = false;
+
+byte inbound = 0;
+
 int makeLinear(float y)
 {
   float a = 102; // pot max
@@ -254,6 +257,7 @@ void receiveEvent(int receiveSize)
 {
   // initialize the slave with the new ID from the master and start the new wire session
   // also opens the bypass transistor to allow communication to the next slave in line.
+  inbound = Wire.read();
   if (initilize == false)
   {
     SlaveID = Wire.read();
@@ -263,6 +267,13 @@ void receiveEvent(int receiveSize)
     digitalWrite(Sdasig, HIGH);
     // sending led 3 was here 
   }
+
+  if (inbound = 136 && initilize == true){ // enter sending state when revieving trigger from master
+
+    sentLayout = false;   
+
+  }
+
 }
 
 void requestEvent()
@@ -366,7 +377,6 @@ void requestEvent()
       sentLayout = true;
       currentRow = 0;
       digitalWrite(Led3, HIGH);
-      
     }
     
   }
